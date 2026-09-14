@@ -1,0 +1,104 @@
+x-airflow-common: &airflow-common
+  #image: apache/airflow:3.3.1-python3.11
+  build: .
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres/${POSTGRES_DB:-airflow}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+    AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+    AIRFLOW__CORE__DAG_BUNDLE_NAME: dags-folder
+    AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: 30
+    SPARK_MASTER: spark://spark-master:7077
+#    AIRFLOW_CONN_SPARK_DEFAULT: "spark://spark-master:7077"
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./data:/opt/airflow/data
+    - ./scripts:/opt/airflow/scripts
+  depends_on:
+    postgres:
+      condition: service_healthy
+  env_file:
+    - .env
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-airflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-airflow}
+      POSTGRES_DB: ${POSTGRES_DB:-airflow}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:-airflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  db-init:
+    <<: *airflow-common
+    command: airflow db migrate 
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow:
+    <<: *airflow-common
+    command: >
+     bash -c "
+     airflow connections add 'spark_default' --conn-type 'spark' --conn-host 'spark://spark-master' --conn-port 7077 2>/dev/null || true &&
+     airflow standalone
+     "
+#    command: airflow standalone
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s  
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+
+  spark-master:
+    image: docker.io/bitnamilegacy/spark:3.5.5
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+    ports:
+      - "8081:8080"  
+      - "7077:7077"  
+    volumes:
+      - ./data:/opt/spark/data
+      - ./scripts:/opt/spark/scripts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      retries: 5
+
+  spark-worker:
+    image: docker.io/bitnamilegacy/spark:3.5.5
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    volumes:
+      - ./data:/opt/spark/data
+      - ./scripts:/opt/spark/scripts
+volumes:
+  postgres_data:
