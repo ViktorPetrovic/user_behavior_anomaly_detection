@@ -28,7 +28,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
 os.environ['PYSPARK_PYTHON'] = sys.executable
 os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 
@@ -45,10 +44,9 @@ os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 #     return spark
 
 def create_spark_session(app_name: str = 'UserAnomalyDetection') -> SparkSession:
-    master = os.getenv("SPARK_MASTER", "local[*]")
     spark = SparkSession.builder \
                 .appName(app_name) \
-                .master(master) \
+                .master("local[*]") \
                 .config("spark.sql.adaptive.enabled", "true") \
                 .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
                 .config("spark.python.worker.reuse", "false") \
@@ -242,22 +240,37 @@ if __name__ == "__main__":
 
         logger.info("Детекция завершена")
         logger.info("Итоговые данные: ")
-        logger.info(f"  - Z-score: {metrics_zscore['predicted_anomalies']} аномалий "
+        logger.info(f"Z-score: {metrics_zscore['predicted_anomalies']} аномалий "
                     f"(precision={metrics_zscore['precision']}, "
                     f"recall={metrics_zscore['recall']}, "
                     f"f1={metrics_zscore['f1_score']})")
-        logger.info(f"  - IQR: {metrics_iqr['predicted_anomalies']} аномалий "
+        logger.info(f"IQR: {metrics_iqr['predicted_anomalies']} аномалий "
                     f"(precision={metrics_iqr['precision']}, "
                     f"recall={metrics_iqr['recall']}, "
                     f"f1={metrics_iqr['f1_score']})")
-        logger.info(f"  - Rapid: {metrics_rapid_activity['predicted_anomalies']} событий "
+        logger.info(f"Rapid: {metrics_rapid_activity['predicted_anomalies']} событий "
                     f"(precision={metrics_rapid_activity['precision']}, "
                     f"recall={metrics_rapid_activity['recall']}, "
                     f"f1={metrics_rapid_activity['f1_score']})")
-        logger.info(f"  - Devices: {metrics_devices['predicted_anomalies']} аномалий "
+        logger.info(f"Devices: {metrics_devices['predicted_anomalies']} аномалий "
                     f"(precision={metrics_devices['precision']}, "
                     f"recall={metrics_devices['recall']}, "
                     f"f1={metrics_devices['f1_score']})")
+
+        all_metrics = [
+            metrics_zscore,
+            metrics_iqr,
+            metrics_rapid_activity,
+            metrics_devices,
+            ]
+        best_method = max(all_metrics, key=lambda m: m['f1_score'])
+        logger.info("Лучший метод детекции")
+        logger.info(f"Метод: {best_method['method']}")
+        logger.info(f"F1-score {best_method['f1_score']}")
+        logger.info(f"Recall {best_method['recall']}")
+        logger.info(f"Precision {best_method['precision']}")
+        logger.info(f"Найдено аномалий: {best_method['predicted_anomalies']}")
+        
     except Exception as e:
         logger.error(f"Ошибка при выполнении {e!s}")
         raise
