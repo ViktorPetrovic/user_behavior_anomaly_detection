@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
-
 class EventGenerator:
     def __init__(self, num_users: int = 50, seed: int = 42):
         self.num_users = num_users
@@ -26,7 +25,7 @@ class EventGenerator:
         self.avg_purchase_amount = 500.0
         logger.info(f"Генератор создан с {num_users} пользователей")
 
-    def generate_normal_event(self, user_id: str = None, timestamp: datetime = None) -> dict:
+    def generate_normal_event(self, user_id: str | None = None, timestamp: datetime | None = None) -> dict:
         if user_id is None:
             user_id = random.choice(self.user_ids)
 
@@ -48,7 +47,7 @@ class EventGenerator:
 
             }
 
-    def generate_anomaly_event(self, timestamp: datetime = None, user_id: str = None) -> dict:
+    def generate_anomaly_event(self, timestamp: datetime | None = None, user_id: str | None = None) -> dict:
 
         if user_id is None:
             user_id = random.choice(self.user_ids)
@@ -110,7 +109,7 @@ class EventGenerator:
         logger.info(f"Создано {len(df)} событий со всплесками, {anomaly_count} аномалий ({anomaly_count/len(df)*100:.1f}%)")
         return df
 
-    def generate_rapid_activity(self, timestamp: datetime, total_events: int = 50, user_id: str = None) -> list:
+    def generate_rapid_activity(self, timestamp: datetime, total_events: int = 50, user_id: str | None = None) -> list:
         if user_id is None:
             user_id = random.choice(self.user_ids)
         logger.debug(f"Генерация всплеска активности для пользователя {user_id}: {total_events} событий")
@@ -145,22 +144,25 @@ class EventGenerator:
         return filepath
 
 if __name__ == "__main__":
-    
+    logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     generator = EventGenerator(num_users=50, seed=42)
     df = generator.generate_dataset(total_events=1000, anomaly_rate=0.05, rapid_rate=0.005,)
 
-    logger.info("\nСтатистика событий")
-    logger.info(f"\nВсего событий: {len(df)}")
+    logger.info("Статистика событий")
+    logger.info(f"Всего событий: {len(df)}")
     logger.info(f"Аномалий: {df['is_anomaly'].sum()}")
-    logger.info("\nТипы событий:")
-    logger.info(df['event_type'].value_counts())
-    logger.info("\nУстройства:")
-    logger.info(df['device'].value_counts())
-    logger.info(f"\nСредняя сумма покупки: {df[df['event_type'] == 'purchase']['amount'].mean():.2f}")
+    logger.info("Типы событий:")
+    logger.info(f"\n{df['event_type'].value_counts()}")
+    logger.info("Устройства:")
+    logger.info(f"\n{df['device'].value_counts()}")
+    logger.info(f"Средняя сумма покупки: {df[df['event_type'] == 'purchase']['amount'].mean():.2f}")
     logger.info(f"Максимальная сумма: {df['amount'].max():.2f}")
 
     
     filepath = Path("data/events/test_events.csv")
     generator.save_to_csv(df, filepath)
 
-    logger.info(f"\nТестовые данные сохранены в {filepath}")
+    logger.info(f"Тестовые данные сохранены в {filepath}")
