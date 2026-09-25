@@ -46,3 +46,7 @@ airflow-webserver.pid
 # Docker
 *.pid
 ruff.toml
+
+# Spark
+*_SUCCESS
+*.crc

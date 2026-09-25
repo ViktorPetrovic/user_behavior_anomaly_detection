@@ -9,7 +9,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
     AIRFLOW__CORE__DAG_BUNDLE_NAME: dags-folder
     AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: 30
-    SPARK_MASTER: spark://spark-master:7077
+#    SPARK_MASTER: spark://spark-master:7077
 #    AIRFLOW_CONN_SPARK_DEFAULT: "spark://spark-master:7077"
   volumes:
     - ./dags:/opt/airflow/dags
@@ -93,8 +93,8 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=1G
-      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=3G
+      - SPARK_WORKER_CORES=2
     depends_on:
       spark-master:
         condition: service_healthy
